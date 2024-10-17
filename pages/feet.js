@@ -185,7 +185,7 @@ export default function Feed() {
         <Navbar />
       </div>
       <div className="flex justify-center space-x-8 mt-4">
-        <div className="max-w-2xl w-full p-4 bg-white rounded-lg shadow-lg">
+        <div className="max-w-2xl w-full p-4  rounded-lg shadow-lg">
           <main className="flex flex-col space-y-6">
             {theories.length === 0 ? (
               <p className="text-center text-gray-600">No theories submitted yet.</p>

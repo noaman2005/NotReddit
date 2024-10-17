@@ -74,6 +74,10 @@
             alert('Profile link copied!');
         };
 
+        const addpost =()=>{
+            router.push('/theory-form')
+        }
+
         return (
             <Layout>
                 <Navbar />
@@ -88,7 +92,7 @@
                         />
                         <div className="flex flex-col">
                             <h2 className="text-2xl font-semibold">{user?.displayName}</h2>
-                            <p className="text-gray-600 mb-2">{user?.bio || 'No bio available'}</p>
+                            <p className="text-red-200 mb-2">{user?.bio || 'No bio available'}</p>
                             <div className="flex space-x-4 mb-2">
                                 <div className="text-center">
                                     <span className="block text-lg font-semibold">{userStats.theories}</span>
@@ -102,6 +106,7 @@
                                     <span className="block text-lg font-semibold">{userStats.following}</span>
                                     <span className="text-gray-500 text-sm">Following</span>
                                 </div>
+                                
                             </div>
                             <div className="flex space-x-4">
                                 <button
@@ -115,6 +120,13 @@
                                     className="bg-gray-100 text-gray-700 font-semibold px-4 py-2 rounded-md hover:bg-gray-200 transition duration-200"
                                 >
                                     Share Profile
+                                </button>
+                                <button onClick={addpost}>
+                                <div >                          
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                    </svg>
+                                </div>
                                 </button>
                             </div>
                         </div>

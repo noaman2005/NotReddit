@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, query, where, getDocs, collection } from 'firebase/firestore';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import Navbar from '../components/Navbar';
@@ -13,9 +13,8 @@ export default function EditProfile() {
     const [photoURL, setPhotoURL] = useState('');
     const [file, setFile] = useState(null);
     const [loading, setLoading] = useState(false);
-    
-    // Initialize showSuccess state
     const [showSuccess, setShowSuccess] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -37,6 +36,7 @@ export default function EditProfile() {
                 setDisplayName(userData.displayName || '');
                 setBio(userData.bio || '');
                 setPhotoURL(userData.photoURL || '/default-avatar.png');
+                console.log('Fetched user data:', userData); // Debugging line
             }
         } catch (error) {
             console.error("Error fetching user data:", error);
@@ -67,26 +67,42 @@ export default function EditProfile() {
         return data.links[0]; // Assuming you're returning an array of links
     };
 
+    const isUsernameUnique = async (username) => {
+        const q = query(collection(db, 'users'), where('displayName', '==', username));
+        const querySnapshot = await getDocs(q);
+        console.log(`Query for username "${username}":`, querySnapshot.empty); // Debugging line
+        return querySnapshot.empty; // Returns true if username is unique
+    };
+
     const handleSaveChanges = async () => {
         if (!user) return;
 
         setLoading(true);
         const userId = auth.currentUser.uid;
         const userRef = doc(db, 'users', userId);
-        const updatedData = {
-            displayName,
-            bio
-        };
+        const updatedData = { displayName, bio };
 
         try {
+            // Check for unique username
+            const isUnique = await isUsernameUnique(displayName);
+            if (!isUnique) {
+                setErrorMessage('Username already exists. Please choose a different username.'); // Set error message
+                setLoading(false);
+                return;
+            } else {
+                setErrorMessage(''); // Clear error message
+            }
+
             if (file) {
                 const imageUrl = await uploadFileToStorage(file);
                 updatedData.photoURL = imageUrl;
             }
 
             await updateDoc(userRef, updatedData);
-           
-            router.push(`/Dashboard`);
+            setShowSuccess(true); // Show success message
+            setTimeout(() => {
+                router.push(`/Dashboard`);
+            }, 2000); // Redirect after 2 seconds
         } catch (error) {
             console.error("Error updating profile:", error);
             alert("An error occurred while updating the profile. Please try again.");
@@ -125,6 +141,11 @@ export default function EditProfile() {
                             className="w-full border p-2 rounded-md focus:outline-none focus:border-blue-500"
                         />
                     </div>
+
+                    {/* Error Message */}
+                    {errorMessage && (
+                        <div className="text-red-500">{errorMessage}</div>
+                    )}
 
                     {/* Bio */}
                     <div className="w-full">
