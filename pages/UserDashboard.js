@@ -1,5 +1,3 @@
-// pages/UserDashboard.js
-
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { auth, db } from '../lib/firebase';
@@ -21,6 +19,7 @@ export default function UserDashboard() {
             fetchUserActivities(id);
         }
     }, [id]);
+
     const fetchUserData = async (userId) => {
         try {
             const userDoc = await getDoc(doc(db, 'users', userId));
@@ -54,25 +53,28 @@ export default function UserDashboard() {
             setLoading(false);
         }
     };
-    
-    
+
     const fetchUserActivities = async (userId) => {
         try {
             const theoriesCollection = collection(db, 'theories');
             const theoriesQuery = query(theoriesCollection, orderBy('createdAt', 'desc'));
             const theoriesSnapshot = await getDocs(theoriesQuery);
-    
-    
+
             const userActivities = theoriesSnapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() }))
                 .filter(activity => activity.userId === userId);
-    
+
             setActivities(userActivities);
         } catch (error) {
             console.error("Error fetching user activities:", error);
         }
     };
-    
+
+    const selectUser = () => {
+        if (!user) return;
+
+        router.push(`/chat/${user.uid}`); // Navigate to chat room
+    };
 
     if (loading) {
         return <div>Loading...</div>; // Loading state
@@ -94,7 +96,9 @@ export default function UserDashboard() {
                         <h2 className="text-2xl font-semibold">{user?.displayName}</h2>
                         <p className="text-red-200 mb-2">{user?.bio || 'No bio available'}</p>
                         <div className="flex space-x-4 mb-2">
-                            
+                            <button onClick={selectUser} className="bg-blue-500 text-white px-4 py-2 rounded">
+                                Message
+                            </button>
                         </div>
                     </div>
                 </div>

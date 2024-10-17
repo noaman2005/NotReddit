@@ -59,11 +59,11 @@ export default function Chat() {
         {users.map((userItem) => (
           <div
             key={userItem.uid}
-            className={`p-3 bg-white rounded-2xl flex items-center shadow-md hover:bg-blue-200 cursor-pointer transition duration-200`}
+            className={`p-3 bg-white rounded-2xl flex items-center shadow-md hover:bg-black hover:text-white cursor-pointer transition duration-200`}
             onClick={() => selectUser(userItem)}
           >
             <img src={userItem.photoURL || '/default-avatar.png'} alt="Avatar" className="w-10 h-10 rounded-full mr-2" />
-            <span className="ml-5 text-gray-800">{userItem.displayName}</span>
+            <span className="ml-5 ">{userItem.displayName}</span>
           </div>
         ))}
       </div>

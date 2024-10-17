@@ -177,7 +177,7 @@ export default function Feed() {
 
   return (
     <Layout>
-      <header className="p-4 flex items-center justify-between bg-red-500 text-white rounded-lg shadow-lg">
+      <header className="p-4 flex items-center justify-between bg-white text-black rounded-lg shadow-lg">
         <h1 className="text-2xl font-bold">Feed</h1>
         
       </header>

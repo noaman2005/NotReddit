@@ -133,7 +133,7 @@ const ChatRoom = () => {
                     {messages.map((msg) => (
                         <div key={msg.id} className={`flex ${msg.uid === user.uid ? 'justify-end' : 'justify-start'}`}>
                             {msg.uid !== user.uid && (
-                                <img src={msg.photoURL} alt="Avatar" className="w-8 h-8 rounded-full mr-2" />
+                                <img src={recipient.photoURL} alt="Avatar" className="w-8 h-8 rounded-full mr-2" />
                             )}
                             <div
                                 className={`rounded-3xl text-md p-3  ${msg.uid === user.uid ? 'bg-blue-300 text-black' : 'bg-gray-300'}`}
