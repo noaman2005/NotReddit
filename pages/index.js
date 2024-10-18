@@ -23,8 +23,7 @@ export default function Home() {
 
   return (
     <div className="flex">
-      {/* Include Navbar */}
-      <Navbar />
+
 
       {/* Main content area with margin to avoid overlap with Navbar */}
       <div className="ml-20 p-6 w-full">
