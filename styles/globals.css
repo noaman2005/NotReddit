@@ -38,9 +38,8 @@ h2 {
 }
 
 /* Custom styles for transition effects */
-@media (max-width: 760px) {
-   
-}
+@media (max-width: 760px) {}
+
 @media (min-width: 768px) {
     /* Styles for desktop devices */
 }

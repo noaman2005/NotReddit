@@ -177,30 +177,28 @@ export default function Feed() {
 
   return (
     <Layout>
-      <header className="p-4 flex items-center justify-between bg-white text-black rounded-lg shadow-lg">
-        <h1 className="text-2xl font-bold">Feed</h1>
-        
+      <header className="p-2 flex items-center justify-between m-3">
+        <h1 className="text-2xl font-bold text-white">Feed</h1>
       </header>
-      <div className="mt-6">
-        <Navbar />
-      </div>
-      <div className="flex justify-center space-x-8 mt-4">
-        <div className="max-w-2xl w-full p-4  rounded-lg shadow-lg">
+      <hr className="border-t border-gray-300 mb-6 w-full" />
+      <div className="mt-6"></div>
+      <div className="flex flex-col md:flex-row justify-center space-x-0 md:space-x-8 mt-4">
+        <div className="max-w-2xl w-full p-4 rounded-lg shadow-lg">
           <main className="flex flex-col space-y-6">
             {theories.length === 0 ? (
               <p className="text-center text-gray-600">No theories submitted yet.</p>
             ) : (
               theories.map((theory) => (
-                <div key={theory.id} className="bg-gray-50 p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
-                  <div className="flex items-center space-x-2 mb-2">
+                <div key={theory.id} className="bg-gradient-to-b from-black to-gray-400 p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
+                  <div className="flex items-center space-x-2 mb-4">
                     <img
                       src={theory.userPhotoURL}
                       alt={theory.userDisplayName}
                       className="w-10 h-10 rounded-full"
                     />
-                    <span className="font-semibold text-gray-800">{theory.userDisplayName}</span>
+                    <span className="font-semibold text-blue-400">{theory.userDisplayName}</span>
                   </div>
-                  <h2 className="font-bold mt-2 text-lg">{theory.title}</h2>
+                  <h2 className="font-bold mt-2 text-lg text-red-900">{theory.title}</h2>
                   {theory.mediaUrl && (
                     <img
                       src={theory.mediaUrl}
@@ -208,35 +206,34 @@ export default function Feed() {
                       className="mt-2 w-full h-auto rounded-lg max-h-80 object-cover"
                     />
                   )}
-                  <p className="p-2 text-black">{theory.description}</p>
+                  <p className="p-2 text-gray-900">{theory.description}</p>
                   <div className="flex items-center justify-between mt-4 space-x-4">
                     <div
                       className={`flex items-center space-x-1 cursor-pointer transition-colors duration-200 ${theory.likedBy.includes(auth.currentUser.uid) ? 'text-red-500' : 'text-gray-600'}`}
                       onClick={() => handleLike(theory.id)}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill={theory.likedBy.includes(auth.currentUser.uid) ? 'red' : 'none'} viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-6 w-6">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
                       </svg>
                       <span>{theory.likes} Likes</span>
                     </div>
-                    <div
-                      className="flex items-center cursor-pointer text-gray-600"
-                      onClick={() => toggleCommentSection(theory.id)}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-6 w-6">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 15.5c0 1.66-1.34 3-3 3H7c-1.66 0-3-1.34-3-3V8c0-1.66 1.34-3 3-3h11c1.66 0 3 1.34 3 3v7.5z" />
+                    <div className="flex items-center space-x-1 cursor-pointer" onClick={() => toggleCommentSection(theory.id)}>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
                       </svg>
                       <span>{comments[theory.id]?.length || 0} Comments</span>
                     </div>
-                    <div className="flex items-center cursor-pointer text-gray-600" onClick={() => handleShare(theory.id)}>
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-6 w-6">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12h6m0 0a4 4 0 00-4-4m4 4a4 4 0 01-4 4m-4-4a4 4 0 00-4-4m0 0a4 4 0 014 4m0 0a4 4 0 014 4" />
+                    <div className="flex items-center space-x-1 cursor-pointer" onClick={() => handleShare(theory.id)}>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
                       </svg>
+                      <span>Share</span>
                     </div>
                   </div>
                   {activeCommentId === theory.id && (
                     <div className="mt-4">
-                      <textarea
+                      <input
+                        type="text"
                         value={commentText}
                         onChange={handleCommentChange}
                         placeholder="Add a comment..."
@@ -244,18 +241,16 @@ export default function Feed() {
                       />
                       <button
                         onClick={() => handleCommentSubmit(theory.id)}
-                        className="mt-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 px-4 rounded transition duration-200"
+                        className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
                       >
-                        Submit Comment
+                        Submit
                       </button>
-                      <div className="mt-2">
-                        {comments[theory.id]?.map((comment) => (
-                          <div key={comment.id} className="border-b border-gray-200 py-2">
-                            <strong>{comment.userDisplayName}: </strong>
-                            <span>{comment.text}</span>
-                          </div>
-                        ))}
-                      </div>
+                      {comments[theory.id]?.map((comment) => (
+                        <div key={comment.id} className="mt-2 text-gray-700">
+                          <strong>{comment.userDisplayName}: </strong>
+                          <span>{comment.text}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -263,21 +258,18 @@ export default function Feed() {
             )}
           </main>
         </div>
-        <div className="h-full p-4 bg-white rounded-lg shadow-lg">
-          <h2 className="text-lg font-semibold mb-4">Suggested Users</h2>
-          <ul>
+        <div className="hidden md:block md:w-64 mt-4 md:mt-0">
+          <h3 className="text-lg font-bold mb-2">Suggested Users</h3>
+          <ul className="bg-white shadow-md rounded-lg p-4">
             {suggestedUsers.map((user) => (
-              <li key={user.id} className="flex items-center mb-3 border-b border-gray-300 py-2 rounded-xl p-1 transition-all duration-100 hover:bg-gray-200 ">
-                <img
-                  src={user.photoURL || '/default-avatar.png'}
-                  alt={user.displayName}
-                  className="w-10 h-10 rounded-full mr-3"
-                />
-                <span className="font-semibold">{user.displayName}</span>
+              <li key={user.id} className="flex items-center space-x-2 p-2 hover:bg-gray-100 cursor-pointer">
+                <img src={user.photoURL || '/default-avatar.png'} alt={user.displayName} className="w-8 h-8 rounded-full" />
+                <span className="font-medium">{user.displayName}</span>
               </li>
             ))}
           </ul>
         </div>
+
       </div>
     </Layout>
   );

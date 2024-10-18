@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { auth, db } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { doc, getDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
 import Layout from '@/components/Layout';
 import Navbar from '../components/Navbar';
@@ -25,24 +25,11 @@ export default function UserDashboard() {
             const userDoc = await getDoc(doc(db, 'users', userId));
             if (userDoc.exists()) {
                 const data = userDoc.data();
-                console.log("Full User Data:", data); // Log full user data
-                
-                // Check if theoriesCount is undefined
-                if (data.theoriesCount === undefined) {
-                    console.warn("Theories count is not defined in the user document.");
-                } else {
-                    console.log("Theories Count:", data.theoriesCount); // Log theories count
-    
-                    // Display the number of theories
-                    alert(`User has ${data.theoriesCount} theories.`);
-                }
-    
                 setUser(data);
                 setUserStats({
                     theories: data.theoriesCount || 0,
                     followers: data.followersCount || 0,
                     following: data.followingCount || 0,
-                    posts: data.postsCount || 0, // Retrieve the number of posts
                 });
             } else {
                 console.error("User does not exist");
@@ -72,8 +59,13 @@ export default function UserDashboard() {
 
     const selectUser = () => {
         if (!user) return;
-
         router.push(`/chat/${user.uid}`); // Navigate to chat room
+    };
+
+    const handleShareProfile = () => {
+        const profileLink = `${window.location.origin}/profile/${user.uid}`;
+        navigator.clipboard.writeText(profileLink);
+        alert('Profile link copied!'); // Alert the user
     };
 
     if (loading) {
@@ -83,37 +75,50 @@ export default function UserDashboard() {
     return (
         <Layout>
             <Navbar />
-            <div className="max-w-3xl mx-auto p-4 text-white">
+            <div className="max-w-3xl mx-auto p-6 rounded-lg  shadow-md text-white">
                 {/* User Profile Section */}
-                <div className="flex items-center space-x-6 mb-4">
+                <div className="flex flex-col md:flex-row items-center space-x-0 md:space-x-8 mb-6">
                     <img
                         src={user?.photoURL || '/default-avatar.png'}
                         alt={user?.displayName || 'User'}
                         referrerPolicy="no-referrer"
-                        className="w-24 h-24 p-2 rounded-full"
+                        className="w-24 h-24 rounded-full border-2 border-gray-300 mb-4 md:mb-0"
                     />
                     <div className="flex flex-col">
-                        <h2 className="text-2xl font-semibold">{user?.displayName}</h2>
-                        <p className="text-red-200 mb-2">{user?.bio || 'No bio available'}</p>
-                        <div className="flex space-x-4 mb-2">
-                            <button onClick={selectUser} className="bg-blue-500 text-white px-4 py-2 rounded">
+                        <h2 className="text-3xl font-semibold">{user?.displayName}</h2>
+                        <p className="text-red-300">{user?.bio || 'No bio available'}</p>
+                        <div className="flex space-x-4 md:space-x-4 mt-4">
+                            <button
+                                onClick={selectUser}
+                                className="px-6 py-2 bg-gray-700 text-white rounded-md hover:bg-blue-600 transition duration-200"
+                            >
                                 Message
+                            </button>
+                            <button
+                                onClick={handleShareProfile}
+                                className="px-6 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-green-200 transition duration-200"
+                            >
+                                Share Profile
                             </button>
                         </div>
                     </div>
                 </div>
                 {/* Activity Feed Section */}
-                <h2 className="text-lg font-bold mb-2">Theories</h2>
-                <div className="space-y-4 text-black">
+                <h2 className="text-2xl font-bold text-green-200 mb-4">Theories</h2>
+                <div className="space-y-6">
                     {activities.length === 0 ? (
                         <p className="text-red-500">No theories found.</p>
                     ) : (
                         activities.map(activity => (
-                            <div key={activity.id} className="p-4 bg-gray-100 rounded-lg shadow">
-                                <h3 className="font-semibold">{activity.title}</h3>
+                            <div key={activity.id} className="p-4 bg-gradient-to-b from-red-300 to-green-400 rounded-lg shadow-md">
+                                <h3 className="text-lg font-semibold">{activity.title}</h3>
                                 <p>{activity.description}</p>
                                 {activity.mediaUrl && (
-                                    <img src={activity.mediaUrl} alt="Activity Media" className="mt-2 w-full h-auto rounded-lg" />
+                                    <img
+                                        src={activity.mediaUrl}
+                                        alt="Activity Media"
+                                        className="mt-4 w-full h-auto rounded-lg"
+                                    />
                                 )}
                             </div>
                         ))
