@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { auth } from '../lib/firebase'; // Firebase config
 import Login from './login'; // Login component
 import Feed from './feet'; // Feed component
-import Navbar from '../components/Navbar'; // Import Navbar component
+import Layout from '../components/Layout'; // Import Layout component
 
 export default function Home() {
   const [user, setUser] = useState(null);
@@ -18,17 +18,18 @@ export default function Home() {
   }, []);
 
   if (loading) {
-    return <div className="text-2xl font-bold text-center mt-20">Loading...</div>; // Show loading indicator
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-2xl font-bold text-gray-800 dark:text-white">Loading...</div>
+        </div>
+      </Layout>
+    ); // Show loading indicator
   }
 
   return (
-    <div className="flex">
-
-
-      {/* Main content area with margin to avoid overlap with Navbar */}
-      <div className="ml-20 p-6 w-full">
-        {user ? <Feed /> : <Login />} {/* Render Feed or Login based on auth state */}
-      </div>
-    </div>
+    <Layout>
+      {user ? <Feed /> : <Login />} {/* Render Feed or Login based on auth state */}
+    </Layout>
   );
 }

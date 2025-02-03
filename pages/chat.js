@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { auth, db } from '../lib/firebase'; // Firebase config
-import { collection, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
+import { collection, addDoc, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import Layout from '../components/Layout'; // Import Layout
+import Layout from '../components/Layout';
 import { useRouter } from 'next/router';
+import { motion } from 'framer-motion';
 
 export default function Chat() {
   const [user, setUser] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [formValue, setFormValue] = useState('');
-  const [recipient, setRecipient] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const dummy = useRef();
   const router = useRouter();
 
@@ -18,6 +19,7 @@ export default function Chat() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -42,32 +44,119 @@ export default function Chat() {
 
   const selectUser = (selectedUser) => {
     if (!user) return;
-
-    router.push(`/chat/${selectedUser.uid}`); // Navigate to chat room
+    router.push(`/chat/${selectedUser.uid}`);
   };
 
-  if (!user) return <p className="text-center text-xl">Loading...</p>;
+  const filteredUsers = users.filter(userItem => 
+    userItem.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!user) {
+    router.push('/login');
+    return null;
+  }
 
   return (
     <Layout>
-      <header className=" p-2  flex items-center justify-between m-2">
-        <h1 className="text-2xl font-bold text-white">Messages</h1>
-      </header>
-      <hr className="border-t border-gray-300 mb-6 w-full" />
-
-      <div className="space-y-2 p-2">
-        {users.map((userItem) => (
-          <div
-            key={userItem.uid}
-            className={`p-3 bg-white rounded-2xl flex items-center shadow-md hover:bg-black hover:text-white cursor-pointer transition duration-200`}
-            onClick={() => selectUser(userItem)}
-          >
-            <img src={userItem.photoURL || '/default-avatar.png'} alt="Avatar" className="w-10 h-10 rounded-full mr-2" />
-            <span className="ml-5 ">{userItem.displayName}</span>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
+          {/* Header */}
+          <div className="p-6 border-b dark:border-gray-700">
+            <h1 className="text-2xl font-bold dark:text-white text-gray-900">Messages</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Connect with other users</p>
           </div>
-        ))}
-      </div>
 
+          {/* Search Bar */}
+          <div className="p-4 border-b dark:border-gray-700">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 border-0 rounded-lg focus:ring-2 focus:ring-purple-500 dark:text-white text-gray-900 placeholder-gray-500 dark:placeholder-gray-400"
+              />
+              <svg
+                className="absolute right-3 top-2.5 h-5 w-5 text-gray-400 dark:text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+          </div>
+
+          {/* User List */}
+          <div className="divide-y dark:divide-gray-700">
+            {filteredUsers.length === 0 ? (
+              <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+                No users found
+              </div>
+            ) : (
+              filteredUsers.map((userItem) => (
+                <motion.div
+                  key={userItem.uid}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  className="p-4 flex items-center space-x-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200"
+                  onClick={() => selectUser(userItem)}
+                >
+                  <div className="relative">
+                    <img
+                      src={userItem.photoURL || '/default-avatar.png'}
+                      alt={userItem.displayName}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                    />
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {userItem.displayName}
+                      </h2>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {userItem.lastActive ? 'Online' : 'Offline'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                      {userItem.status || 'No status'}
+                    </p>
+                  </div>
+                  <svg
+                    className="h-5 w-5 text-gray-400 dark:text-gray-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </motion.div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
     </Layout>
   );
 }

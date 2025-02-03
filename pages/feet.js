@@ -2,19 +2,36 @@ import { useEffect, useState } from 'react';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/router';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, orderBy, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc,
+   query, orderBy, arrayUnion, arrayRemove, limit, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Layout from '@/components/Layout';
 import Navbar from '../components/Navbar';
+import { getTimeAgo } from '@/utils/date';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Feed() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [theories, setTheories] = useState([]);
-  const [suggestedUsers, setSuggestedUsers] = useState([]);
+  const [trendingTopics, setTrendingTopics] = useState([]);
   const [activeCommentId, setActiveCommentId] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState({});
+  const [likeInProgress, setLikeInProgress] = useState({});
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('darkMode');
+      return saved ? JSON.parse(saved) : false;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -23,7 +40,7 @@ export default function Feed() {
       } else {
         setLoading(false);
         fetchTheories();
-        fetchSuggestedUsers();
+        fetchTrendingTopics();
       }
     });
     return () => unsubscribe();
@@ -76,17 +93,45 @@ export default function Feed() {
     }
   };
 
-  const fetchSuggestedUsers = async () => {
+  const fetchTrendingTopics = async () => {
     try {
-      const usersCollection = collection(db, 'users');
-      const usersSnapshot = await getDocs(usersCollection);
-      const usersList = usersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setSuggestedUsers(usersList);
+      // Get theories from the last 7 days
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const theoriesCollection = collection(db, 'theories');
+      const recentTheoriesQuery = query(
+        theoriesCollection,
+        where('createdAt', '>=', sevenDaysAgo),
+        orderBy('createdAt', 'desc')
+      );
+      const theoriesSnapshot = await getDocs(recentTheoriesQuery);
+
+      // Extract and count hashtags
+      const hashtagCounts = {};
+      theoriesSnapshot.docs.forEach(doc => {
+        const theory = doc.data();
+        const hashtags = (theory.description || '').match(/#\w+/g) || [];
+        hashtags.forEach(tag => {
+          hashtagCounts[tag] = (hashtagCounts[tag] || 0) + 1;
+        });
+      });
+
+      // Sort hashtags by count and get top 5
+      const sortedTrending = Object.entries(hashtagCounts)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([tag, count]) => ({
+          tag,
+          count,
+          posts: theoriesSnapshot.docs.filter(doc => 
+            doc.data().description?.includes(tag)
+          ).length
+        }));
+
+      setTrendingTopics(sortedTrending);
     } catch (error) {
-      console.error("Error fetching suggested users:", error);
+      console.error("Error fetching trending topics:", error);
     }
   };
 
@@ -96,6 +141,48 @@ export default function Feed() {
       router.push('/login');
     } catch (error) {
       console.error("Sign Out Error:", error.message);
+    }
+  };
+
+  const handleLike = async (theoryId) => {
+    // Prevent multiple clicks while processing
+    if (likeInProgress[theoryId]) return;
+    
+    const currentUserId = auth.currentUser.uid;
+    setLikeInProgress(prev => ({ ...prev, [theoryId]: true }));
+
+    try {
+      const theoryRef = doc(db, 'theories', theoryId);
+      const theoryDoc = await getDoc(theoryRef);
+      const theoryData = theoryDoc.data();
+      const likedBy = Array.isArray(theoryData.likedBy) ? theoryData.likedBy : [];
+      const isLiked = likedBy.includes(currentUserId);
+
+      // Update Firestore
+      await updateDoc(theoryRef, {
+        likes: isLiked ? theoryData.likes - 1 : theoryData.likes + 1,
+        likedBy: isLiked ? arrayRemove(currentUserId) : arrayUnion(currentUserId),
+      });
+
+      // Only update UI after successful Firestore update
+      setTheories(prevTheories =>
+        prevTheories.map(theory => {
+          if (theory.id === theoryId) {
+            return {
+              ...theory,
+              likes: isLiked ? theory.likes - 1 : theory.likes + 1,
+              likedBy: isLiked 
+                ? theory.likedBy.filter(id => id !== currentUserId)
+                : [...theory.likedBy, currentUserId],
+            };
+          }
+          return theory;
+        })
+      );
+    } catch (error) {
+      console.error('Error updating like:', error);
+    } finally {
+      setLikeInProgress(prev => ({ ...prev, [theoryId]: false }));
     }
   };
 
@@ -125,45 +212,6 @@ export default function Feed() {
     }
   };
 
-  const handleLike = async (theoryId) => {
-    const currentUserId = auth.currentUser.uid;
-    setTheories((prevTheories) =>
-      prevTheories.map((theory) => {
-        if (theory.id === theoryId) {
-          const likedBy = Array.isArray(theory.likedBy) ? theory.likedBy : [];
-          const isLiked = likedBy.includes(currentUserId);
-          return {
-            ...theory,
-            likes: isLiked ? theory.likes - 1 : theory.likes + 1,
-            likedBy: isLiked ? likedBy.filter((id) => id !== currentUserId) : [...likedBy, currentUserId],
-          };
-        }
-        return theory;
-      })
-    );
-
-    try {
-      const theoryRef = doc(db, 'theories', theoryId);
-      const theoryDoc = await getDoc(theoryRef);
-      const theoryData = theoryDoc.data();
-      const likedBy = Array.isArray(theoryData.likedBy) ? theoryData.likedBy : [];
-      const isLiked = likedBy.includes(currentUserId);
-      if (isLiked) {
-        await updateDoc(theoryRef, {
-          likes: theoryData.likes - 1,
-          likedBy: arrayRemove(currentUserId),
-        });
-      } else {
-        await updateDoc(theoryRef, {
-          likes: theoryData.likes + 1,
-          likedBy: arrayUnion(currentUserId),
-        });
-      }
-    } catch (error) {
-      console.error('Error updating like:', error);
-    }
-  };
-
   const handleShare = (theoryId) => {
     const shareUrl = `${window.location.origin}/theory/${theoryId}`;
     navigator.clipboard.writeText(shareUrl)
@@ -171,105 +219,227 @@ export default function Feed() {
       .catch((error) => console.error('Error copying shareable link:', error));
   };
 
-  if (loading) {
-    return <div className="text-2xl font-bold text-center mt-20">Loading...</div>;
-  }
-
   return (
     <Layout>
-      <header className="p-2 flex items-center justify-between m-3">
-        <h1 className="text-2xl font-bold text-white">Feed</h1>
-      </header>
-      <hr className="border-t border-gray-300 mb-6 w-full" />
-      <div className="mt-6"></div>
-      <div className="flex flex-col md:flex-row justify-center space-x-0 md:space-x-8 mt-4">
-        <div className="max-w-2xl w-full p-4 rounded-lg shadow-lg">
-          <main className="flex flex-col space-y-6">
-            {theories.length === 0 ? (
-              <p className="text-center text-gray-600">No theories submitted yet.</p>
-            ) : (
-              theories.map((theory) => (
-                <div key={theory.id} className="bg-gradient-to-b from-black to-gray-400 p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <img
-                      src={theory.userPhotoURL}
-                      alt={theory.userDisplayName}
-                      className="w-10 h-10 rounded-full"
-                    />
-                    <span className="font-semibold text-blue-400">{theory.userDisplayName}</span>
-                  </div>
-                  <h2 className="font-bold mt-2 text-lg text-red-900">{theory.title}</h2>
-                  {theory.mediaUrl && (
-                    <img
-                      src={theory.mediaUrl}
-                      alt="Theory Media"
-                      className="mt-2 w-full h-auto rounded-lg max-h-80 object-cover"
-                    />
-                  )}
-                  <p className="p-2 text-gray-900">{theory.description}</p>
-                  <div className="flex items-center justify-between mt-4 space-x-4">
-                    <div
-                      className={`flex items-center space-x-1 cursor-pointer transition-colors duration-200 ${theory.likedBy.includes(auth.currentUser.uid) ? 'text-red-500' : 'text-gray-600'}`}
-                      onClick={() => handleLike(theory.id)}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
-                      </svg>
-                      <span>{theory.likes} Likes</span>
-                    </div>
-                    <div className="flex items-center space-x-1 cursor-pointer" onClick={() => toggleCommentSection(theory.id)}>
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
-                      </svg>
-                      <span>{comments[theory.id]?.length || 0} Comments</span>
-                    </div>
-                    <div className="flex items-center space-x-1 cursor-pointer" onClick={() => handleShare(theory.id)}>
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
-                      </svg>
-                      <span>Share</span>
+      <div className="p-6">
+        <div className="max-w-4xl mx-auto">
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 animate-pulse">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
                     </div>
                   </div>
-                  {activeCommentId === theory.id && (
-                    <div className="mt-4">
-                      <input
-                        type="text"
-                        value={commentText}
-                        onChange={handleCommentChange}
-                        placeholder="Add a comment..."
-                        className="w-full p-2 border border-gray-300 rounded-lg"
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-2 space-y-6">
+                {theories.map((theory) => (
+                  <motion.div
+                    key={theory.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700"
+                  >
+                    {/* User Header */}
+                    <div className="flex items-center p-4">
+                      <img
+                        src={theory.userPhotoURL}
+                        alt={theory.userDisplayName}
+                        className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600"
                       />
-                      <button
-                        onClick={() => handleCommentSubmit(theory.id)}
-                        className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                      >
-                        Submit
-                      </button>
-                      {comments[theory.id]?.map((comment) => (
-                        <div key={comment.id} className="mt-2 text-gray-700">
-                          <strong>{comment.userDisplayName}: </strong>
-                          <span>{comment.text}</span>
-                        </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-semibold dark:text-white">
+                          {theory.userDisplayName}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {getTimeAgo(theory.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Media Content */}
+                    {theory.mediaUrl && (
+                      <div className="relative">
+                        <img
+                          src={theory.mediaUrl}
+                          alt="Post content"
+                          className="w-full aspect-auto object-cover max-h-[500px]"
+                        />
+                      </div>
+                    )}
+
+                    {/* Description */}
+                    {theory.description && (
+                      <div className="p-4">
+                        <p className="text-gray-800 dark:text-gray-200">
+                          {theory.description}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="p-4 border-t dark:border-gray-700">
+                      <div className="flex items-center space-x-4">
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleLike(theory.id)}
+                          className={`flex items-center space-x-1.5 ${
+                            theory.likedBy?.includes(auth.currentUser?.uid)
+                              ? 'text-purple-500'
+                              : 'text-gray-600 dark:text-gray-400 hover:text-purple-500 dark:hover:text-purple-400'
+                          }`}
+                        >
+                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                            />
+                          </svg>
+                          <span>{theory.likes}</span>
+                        </motion.button>
+
+                        <button
+                          onClick={() => setActiveCommentId(activeCommentId === theory.id ? null : theory.id)}
+                          className="flex items-center space-x-1.5 text-gray-600 dark:text-gray-400 hover:text-purple-500 dark:hover:text-purple-400"
+                        >
+                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                            />
+                          </svg>
+                          <span>{comments[theory.id]?.length || 0}</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleShare(theory.id)}
+                          className="flex items-center space-x-1.5 text-gray-600 dark:text-gray-400 hover:text-purple-500 dark:hover:text-purple-400"
+                        >
+                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* Comments Section */}
+                      {activeCommentId === theory.id && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="mt-4 space-y-4"
+                        >
+                          {comments[theory.id]?.map((comment) => (
+                            <div
+                              key={comment.id}
+                              className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm font-semibold dark:text-white">
+                                  {comment.userDisplayName}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {getTimeAgo(comment.createdAt)}
+                                </span>
+                              </div>
+                              <p className="text-sm mt-1 text-gray-700 dark:text-gray-300">
+                                {comment.text}
+                              </p>
+                            </div>
+                          ))}
+
+                          <div className="flex space-x-2 mt-4">
+                            <input
+                              type="text"
+                              value={commentText}
+                              onChange={(e) => setCommentText(e.target.value)}
+                              placeholder="Add a comment..."
+                              className="flex-1 rounded-lg px-4 py-2 text-sm bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => handleCommentSubmit(theory.id)}
+                              className="px-4 py-2 text-sm font-medium text-white bg-purple-500 rounded-lg hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            >
+                              Post
+                            </motion.button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Trending Topics Sidebar */}
+              <div className="space-y-6">
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4">
+                  <h2 className="text-lg font-semibold mb-4 dark:text-white">Trending Topics</h2>
+                  {trendingTopics.length > 0 ? (
+                    <div className="space-y-4">
+                      {trendingTopics.map(({ tag, count, posts }) => (
+                        <motion.div
+                          key={tag}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                          onClick={() => router.push(`/search?q=${encodeURIComponent(tag)}`)}
+                        >
+                          <div>
+                            <p className="font-medium text-purple-500">{tag}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {posts} {posts === 1 ? 'post' : 'posts'}
+                            </p>
+                          </div>
+                          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                            <span className="font-medium">{count}</span>
+                            <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            </svg>
+                          </div>
+                        </motion.div>
                       ))}
                     </div>
+                  ) : (
+                    <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+                      No trending topics yet
+                    </p>
                   )}
                 </div>
-              ))
-            )}
-          </main>
-        </div>
-        <div className="hidden md:block md:w-64 mt-4 md:mt-0">
-          <h3 className="text-lg font-bold mb-2">Suggested Users</h3>
-          <ul className="bg-white shadow-md rounded-lg p-4">
-            {suggestedUsers.map((user) => (
-              <li key={user.id} className="flex items-center space-x-2 p-2 hover:bg-gray-100 cursor-pointer">
-                <img src={user.photoURL || '/default-avatar.png'} alt={user.displayName} className="w-8 h-8 rounded-full" />
-                <span className="font-medium">{user.displayName}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
 
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-4">
+                  <h2 className="text-lg font-semibold mb-2 dark:text-white">Create a Post</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Share your thoughts with the community
+                  </p>
+                  <button
+                    onClick={() => router.push('/theory-form')}
+                    className="w-full px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                  >
+                    Create Post
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </Layout>
   );
