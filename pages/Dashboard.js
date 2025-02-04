@@ -4,6 +4,8 @@ import { useRouter } from 'next/router';
 import { collection, getDocs, doc, getDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Layout from '@/components/Layout';
+import { motion } from 'framer-motion';
+import { getTimeAgo } from '@/utils/date';
 
 export default function UserDashboard() {
     const router = useRouter();
@@ -11,6 +13,7 @@ export default function UserDashboard() {
     const [user, setUser] = useState(null);
     const [userStats, setUserStats] = useState({ theories: 0, followers: 0, following: 0 });
     const [activities, setActivities] = useState([]);
+    const [selectedTab, setSelectedTab] = useState('theories');
 
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -30,11 +33,11 @@ export default function UserDashboard() {
             const userDoc = await getDoc(doc(db, 'users', userId));
             if (userDoc.exists()) {
                 setUser(userDoc.data());
-                setUserStats({
-                    theories: userDoc.data().theoriesCount || 0,
+                setUserStats(prev => ({
+                    ...prev,
                     followers: userDoc.data().followersCount || 0,
                     following: userDoc.data().followingCount || 0,
-                });
+                }));
             }
         } catch (error) {
             console.error("Error fetching user data:", error);
@@ -52,8 +55,8 @@ export default function UserDashboard() {
                 .filter(theory => theory.userId === userId);
 
             setActivities(userActivities);
-            setUserStats(prevStats => ({
-                ...prevStats,
+            setUserStats(prev => ({
+                ...prev,
                 theories: userActivities.length
             }));
         } catch (error) {
@@ -66,9 +69,9 @@ export default function UserDashboard() {
     };
 
     const handleShareProfile = () => {
-        const profileLink = `${window.location.origin}/profile/${auth.currentUser.uid}`;
+        const profileLink = `${window.location.origin}/Dashboard`;
         navigator.clipboard.writeText(profileLink);
-        alert('Profile link copied!');
+        alert('Profile link copied to clipboard!');
     };
 
     const addpost = () => {
@@ -78,85 +81,193 @@ export default function UserDashboard() {
     if (loading) {
         return (
             <Layout>
-                <div className="flex items-center justify-center min-h-screen">
+                <div className="min-h-screen bg-gray-900 flex items-center justify-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
                 </div>
             </Layout>
         );
     }
 
+    const tabs = [
+        { id: 'theories', label: 'Theories', count: userStats.theories },
+        { id: 'followers', label: 'Followers', count: userStats.followers },
+        { id: 'following', label: 'Following', count: userStats.following },
+    ];
+
     return (
         <Layout>
-            <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md dark:bg-gray-800 bg-white mt-8">
-                {/* User Profile Section */}
-                <div className="flex flex-col md:flex-row items-center space-x-0 md:space-x-8 mb-6">
-                    <img
-                        src={user?.photoURL || '/default-avatar.png'}
-                        alt={user?.displayName || 'User'}
-                        referrerPolicy="no-referrer"
-                        className="w-24 h-24 rounded-full border-2 border-gray-300 mb-4 md:mb-0"
-                    />
-                    <div className="flex flex-col">
-                        <h2 className="text-3xl font-sans dark:text-white text-gray-900">{user?.displayName}</h2>
-                        <p className="dark:text-gray-300 text-gray-600">{user?.bio || 'No bio available'}</p>
-                        <div className="flex space-x-4 md:space-x-8 mt-4">
-                            <div className="text-center">
-                                <span className="block text-2xl font-semibold dark:text-white text-gray-900">{userStats.theories}</span>
-                                <span className="dark:text-gray-400 text-gray-600 text-sm">Posts</span>
-                            </div>
-                            <div className="text-center">
-                                <span className="block text-2xl font-semibold dark:text-white text-gray-900">{userStats.followers}</span>
-                                <span className="dark:text-gray-400 text-gray-600 text-sm">Followers</span>
-                            </div>
-                            <div className="text-center">
-                                <span className="block text-2xl font-semibold dark:text-white text-gray-900">{userStats.following}</span>
-                                <span className="dark:text-gray-400 text-gray-600 text-sm">Following</span>
+            <div className="min-h-screen bg-gray-900">
+                <div className="max-w-7xl mx-auto px-4 py-8">
+                    {/* Profile Header */}
+                    <div className="bg-gray-800 rounded-xl p-6 mb-6 shadow-lg">
+                        <div className="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.5 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                <img
+                                    src={user?.photoURL || '/default-avatar.png'}
+                                    alt={user?.displayName || 'User'}
+                                    className="w-32 h-32 rounded-full border-4 border-purple-500 shadow-lg object-cover"
+                                />
+                            </motion.div>
+                            
+                            <div className="flex-1 text-center md:text-left">
+                                <motion.h1 
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="text-3xl font-bold text-white mb-2"
+                                >
+                                    {user?.displayName}
+                                </motion.h1>
+                                
+                                <motion.p 
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.1 }}
+                                    className="text-gray-400 mb-4 max-w-2xl"
+                                >
+                                    {user?.bio || 'No bio available'}
+                                </motion.p>
+
+                                <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                                    <button
+                                        onClick={handleEditProfile}
+                                        className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center space-x-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        <span>Edit Profile</span>
+                                    </button>
+                                    
+                                    <button
+                                        onClick={handleShareProfile}
+                                        className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center space-x-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                        </svg>
+                                        <span>Share</span>
+                                    </button>
+
+                                    <button
+                                        onClick={addpost}
+                                        className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        <span>New Theory</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                        <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mt-6">
-                            <button
-                                onClick={handleEditProfile}
-                                className="px-6 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition duration-200"
-                            >
-                                Edit Profile
-                            </button>
-                            <button
-                                onClick={handleShareProfile}
-                                className="px-6 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200"
-                            >
-                                Share Profile
-                            </button>
-                            <button
-                                onClick={addpost}
-                                className="p-2 bg-purple-500 text-white rounded-full hover:bg-purple-600 transition duration-200"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                </svg>
-                            </button>
+
+                        {/* Stats Tabs */}
+                        <div className="mt-8 border-t border-gray-700 pt-6">
+                            <div className="flex justify-around">
+                                {tabs.map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setSelectedTab(tab.id)}
+                                        className={`flex flex-col items-center transition-colors ${
+                                            selectedTab === tab.id
+                                                ? 'text-purple-500'
+                                                : 'text-gray-400 hover:text-white'
+                                        }`}
+                                    >
+                                        <span className="text-2xl font-bold">{tab.count}</span>
+                                        <span className="text-sm">{tab.label}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
-                {/* Activity Feed Section */}
-                <h2 className="text-2xl font-bold dark:text-white text-gray-900 mb-4">Theories</h2>
-                <div className="space-y-6">
-                    {activities.length === 0 ? (
-                        <p className="dark:text-gray-300 text-gray-600">No theories found.</p>
-                    ) : (
-                        activities.map(activity => (
-                            <div key={activity.id} className="p-4 bg-white dark:bg-gray-700 rounded-lg shadow-md">
-                                <h3 className="text-lg font-semibold dark:text-white text-gray-900">{activity.title}</h3>
-                                <p className="dark:text-gray-300 text-gray-600">{activity.description}</p>
-                                {activity.mediaUrl && (
-                                    <img
-                                        src={activity.mediaUrl}
-                                        alt="Activity Media"
-                                        className="mt-4 w-full h-auto rounded-lg"
-                                    />
-                                )}
+
+                    {/* Theories Feed */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {activities.length === 0 ? (
+                            <div className="col-span-full text-center py-12 bg-gray-800 rounded-xl">
+                                <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                <p className="text-gray-400 text-lg">No theories yet</p>
+                                <button
+                                    onClick={() => router.push('/theory-form')}
+                                    className="mt-4 px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-500 text-white rounded-lg hover:from-purple-700 hover:to-blue-600 transition-all duration-200 flex items-center justify-center mx-auto space-x-2"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    <span>Create Your First Theory</span>
+                                </button>
                             </div>
-                        ))
-                    )}
+                        ) : (
+                            activities.map((activity, index) => (
+                                <motion.div
+                                    key={activity.id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.1 }}
+                                    className="bg-gray-800 rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col group hover:-translate-y-1"
+                                >
+                                    {activity.mediaUrl ? (
+                                        <div className="relative aspect-[4/3]">
+                                            <img
+                                                src={activity.mediaUrl}
+                                                alt="Theory media"
+                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                        </div>
+                                    ) : (
+                                        <div className="relative aspect-[4/3] bg-gradient-to-br from-purple-600/20 to-blue-500/20 flex items-center justify-center">
+                                            <svg className="w-12 h-12 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                            </svg>
+                                        </div>
+                                    )}
+                                    <div className="p-5 flex-1 flex flex-col">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h3 className="text-lg font-semibold text-white line-clamp-1">
+                                                {activity.title || 'Untitled Theory'}
+                                            </h3>
+                                            <span className="text-sm text-gray-400">
+                                                {getTimeAgo(activity.createdAt)}
+                                            </span>
+                                        </div>
+                                        <p className="text-gray-300 mb-4 line-clamp-2">
+                                            {activity.description}
+                                        </p>
+                                        <div className="mt-auto flex items-center justify-between text-gray-400 text-sm">
+                                            <div className="flex items-center space-x-4">
+                                                <span className="flex items-center">
+                                                    <svg className="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                                    </svg>
+                                                    {activity.likes || 0}
+                                                </span>
+                                                <span className="flex items-center">
+                                                    <svg className="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                    </svg>
+                                                    {(activity.comments?.length || 0)}
+                                                </span>
+                                            </div>
+                                            <button 
+                                                className="text-blue-400 hover:text-blue-300 transition-colors duration-200"
+                                                onClick={() => router.push(`/theory/${activity.id}`)}
+                                            >
+                                                Read More
+                                            </button>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))
+                        )}
+                    </div>
                 </div>
             </div>
         </Layout>

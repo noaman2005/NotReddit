@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { auth, db } from '../lib/firebase';
-import { collection, addDoc, query, orderBy, onSnapshot, where } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, where, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import Layout from '../components/Layout';
 import { useRouter } from 'next/router';
@@ -11,9 +11,51 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState([]);
+  const [onlineUsers, setOnlineUsers] = useState({});
   const [loading, setLoading] = useState(true);
   const dummy = useRef();
   const router = useRouter();
+
+  // Handle user's online status
+  useEffect(() => {
+    if (!user) return;
+
+    // Set user as online
+    const userStatusRef = doc(db, 'status', user.uid);
+    const updateOnlineStatus = async () => {
+      await setDoc(userStatusRef, {
+        online: true,
+        lastSeen: serverTimestamp()
+      });
+    };
+
+    // Set up cleanup for when user goes offline
+    const setupOfflineStatus = async () => {
+      await setDoc(userStatusRef, {
+        online: false,
+        lastSeen: serverTimestamp()
+      });
+    };
+
+    updateOnlineStatus();
+
+    // Handle page visibility change
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateOnlineStatus();
+      } else {
+        setupOfflineStatus();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      setupOfflineStatus();
+    };
+  }, [user]);
 
   // Check for authentication state
   useEffect(() => {
@@ -24,11 +66,11 @@ export default function Chat() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch users for chat
+  // Fetch users and their online status
   useEffect(() => {
     if (!user) return;
 
-    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+    const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const usersArray = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
@@ -39,7 +81,19 @@ export default function Chat() {
       setUsers(usersArray);
     });
 
-    return () => unsubscribe();
+    // Listen for online status changes
+    const unsubscribeStatus = onSnapshot(collection(db, 'status'), (snapshot) => {
+      const onlineStatus = {};
+      snapshot.forEach((doc) => {
+        onlineStatus[doc.id] = doc.data().online;
+      });
+      setOnlineUsers(onlineStatus);
+    });
+
+    return () => {
+      unsubscribeUsers();
+      unsubscribeStatus();
+    };
   }, [user]);
 
   const selectUser = (selectedUser) => {
@@ -123,7 +177,9 @@ export default function Chat() {
                       alt={userItem.displayName}
                       className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                     />
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></span>
+                    {onlineUsers[userItem.uid] && (
+                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
@@ -131,7 +187,7 @@ export default function Chat() {
                         {userItem.displayName}
                       </h2>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {userItem.lastActive ? 'Online' : 'Offline'}
+                        {onlineUsers[userItem.uid] ? 'Online' : 'Offline'}
                       </span>
                     </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400 truncate">

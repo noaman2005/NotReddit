@@ -49,7 +49,7 @@ export default function Login() {
         >
           <div className="text-center">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome Back</h2>
-            <p className="mt-2 text-gray-600 dark:text-gray-300">Sign in to continue to NotReddit</p>
+            <p className="mt-2 text-gray-600 dark:text-gray-300">Sign in to continue to NotInsta</p>
           </div>
 
           {error && (
@@ -128,15 +128,12 @@ export default function Login() {
           </motion.button>
 
           <div className="text-center text-sm">
-            <span className="text-gray-600 dark:text-gray-400">
-              Don't have an account?{' '}
-            </span>
-            <Link 
-              href="/signup"
-              className="text-purple-500 hover:text-purple-600 font-medium"
-            >
-              Sign Up
-            </Link>
+            <p className="text-sm text-gray-600 mt-2">
+              Don&apos;t have an account?{' '}
+              <Link href="/signup" className="text-blue-500 hover:text-blue-600">
+                Sign up
+              </Link>
+            </p>
           </div>
         </motion.div>
       </div>

@@ -67,6 +67,12 @@ export default function Signup() {
         bio: ''
       });
 
+      // Initialize user stats
+      await setDoc(doc(db, 'userStats', userCredential.user.uid), {
+        followers: [],
+        following: []
+      });
+
       // Redirect to feed page
       router.push('/feet');
     } catch (error) {
@@ -88,7 +94,7 @@ export default function Signup() {
         >
           <div className="text-center">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Create Account</h2>
-            <p className="mt-2 text-gray-600 dark:text-gray-300">Join NotReddit today</p>
+            <p className="mt-2 text-gray-600 dark:text-gray-300">Join NotInsta today</p>
           </div>
 
           {error && (

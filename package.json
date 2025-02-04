@@ -1,5 +1,5 @@
 {
-  "name": "programs",
+  "name": "notinsta",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,7 +14,7 @@
     "axios": "^1.7.7",
     "crypto-js": "^4.2.0",
     "firebase": "^10.14.0",
-    "framer-motion": "^11.11.7",
+    "framer-motion": "^11.18.2",
     "mime-types": "^2.1.35",
     "multiparty": "^4.2.3",
     "next": "^14.2.15",

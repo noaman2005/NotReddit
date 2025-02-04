@@ -1,9 +1,15 @@
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Navbar from './Navbar';
-import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 
 export default function Layout({ children }) {
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const router = useRouter();
+
+  // Pages where navbar should be hidden
+  const noNavbarPages = ['/login', '/signup'];
+  const hideNavbar = noNavbarPages.includes(router.pathname);
 
   useEffect(() => {
     // Check local storage for dark mode preference
@@ -31,19 +37,18 @@ export default function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className={`min-h-screen ${isDarkMode ? 'dark' : ''}`}>
       <Head>
-        <title>NotReddit</title>
+        <title>NotInsta</title>
         <meta name="description" content="A modern social media platform" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="flex">
-        <Navbar isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />
-        <main className="flex-1 ml-16">
-          {children}
-        </main>
-      </div>
+      {!hideNavbar && <Navbar isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />}
+      
+      <main className={`${!hideNavbar ? 'ml-16' : ''} flex-1 transition-all duration-300`}>
+        {children}
+      </main>
     </div>
   );
 }
