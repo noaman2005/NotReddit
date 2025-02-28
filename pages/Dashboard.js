@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { auth } from '../lib/firebase';
 import { useRouter } from 'next/router';
-import { collection, getDocs, doc, getDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, orderBy, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
@@ -76,6 +76,22 @@ export default function UserDashboard() {
 
     const addpost = () => {
         router.push('/theory-form');
+    };
+
+    const handleDeleteTheory = async (theoryId) => {
+        if (!user) return;
+
+        const confirmDelete = window.confirm('Are you sure you want to delete this theory?');
+        if (!confirmDelete) return;
+
+        try {
+            await deleteDoc(doc(db, 'theories', theoryId));
+            // Update local state to remove the deleted theory
+            setActivities(prev => prev.filter(activity => activity.id !== theoryId));
+        } catch (error) {
+            console.error('Error deleting theory:', error);
+            alert('Failed to delete theory');
+        }
     };
 
     if (loading) {
@@ -256,12 +272,20 @@ export default function UserDashboard() {
                                                     {(activity.comments?.length || 0)}
                                                 </span>
                                             </div>
-                                            <button 
-                                                className="text-blue-400 hover:text-blue-300 transition-colors duration-200"
-                                                onClick={() => router.push(`/theory/${activity.id}`)}
-                                            >
-                                                Read More
-                                            </button>
+                                            <div className="flex items-center space-x-2">
+                                                <button 
+                                                    className="text-blue-400 hover:text-blue-300 transition-colors duration-200"
+                                                    onClick={() => router.push(`/theory/${activity.id}`)}
+                                                >
+                                                    Read More
+                                                </button>
+                                                <button 
+                                                    className="text-red-400 hover:text-red-300 transition-colors duration-200"
+                                                    onClick={() => handleDeleteTheory(activity.id)}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </motion.div>
